@@ -8,7 +8,8 @@ RUN apt-get -y update \
       libzip-dev \
       zip \
       unzip \
-    && docker-php-ext-install zip
+    && docker-php-ext-install zip \
+    && pecl install xdebug
 
 
 WORKDIR application

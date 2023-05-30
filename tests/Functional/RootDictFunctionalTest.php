@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace DDA58\AssertJsonScheme\Tests\Functional;
 
+use DDA58\AssertJsonScheme\Exception\AssertFailedException;
+use DDA58\AssertJsonScheme\Node\Dict\DictNamedNode;
+use DDA58\AssertJsonScheme\Node\Dict\DictNamedNodeWithKeysAssertion;
+use DDA58\AssertJsonScheme\Node\Dict\DictNamelessNode;
+use DDA58\AssertJsonScheme\Node\List\ListNamedNode;
+use DDA58\AssertJsonScheme\Node\List\ListNamelessNode;
+use DDA58\AssertJsonScheme\Node\Scalar\BoolNamedNode;
+use DDA58\AssertJsonScheme\Node\Scalar\IntNamedNode;
+use DDA58\AssertJsonScheme\Node\Scalar\StringNamedNode;
+use DDA58\AssertJsonScheme\Node\Scalar\StringNamelessNode;
+use DDA58\AssertJsonScheme\RootNode\RootDictNode;
 use Faker\Factory;
 use PHPUnit\Framework\TestCase;
-use DDA58\AssertJsonScheme\Dict\Node\DictNamedNode;
-use DDA58\AssertJsonScheme\Dict\Node\DictNamedNodeWithKeysAssertion;
-use DDA58\AssertJsonScheme\Dict\Node\DictNamelessNode;
-use DDA58\AssertJsonScheme\List\Node\ListNamedNode;
-use DDA58\AssertJsonScheme\List\Node\ListNamelessNode;
-use DDA58\AssertJsonScheme\Root\Node\RootDictNode;
-use DDA58\AssertJsonScheme\Scalar\Node\BoolNamedNode;
-use DDA58\AssertJsonScheme\Scalar\Node\IntNamedNode;
-use DDA58\AssertJsonScheme\Scalar\Node\StringNamedNode;
-use DDA58\AssertJsonScheme\Scalar\Node\StringNamelessNode;
 
 class RootDictFunctionalTest extends TestCase
 {
@@ -27,22 +28,27 @@ class RootDictFunctionalTest extends TestCase
         string $json
     ): void {
         $root->assert(json_decode($json, true));
+
+        self::expectNotToPerformAssertions();
     }
 
     public function successAssertDataProvider(): iterable
     {
         $faker = Factory::create();
 
-        yield [
+        yield 'First case' => [
             new RootDictNode([
                 new BoolNamedNode('boolResult'),
                 new BoolNamedNode('boolResultTwo'),
                 new StringNamedNode('phone'),
                 new StringNamedNode('mail'),
-                new ListNamedNode('phonesList', new DictNamelessNode([
-                    new StringNamedNode('type'),
-                    new StringNamedNode('number')
-                ])),
+                new ListNamedNode(
+                    'phonesList',
+                    new DictNamelessNode([
+                        new StringNamedNode('type'),
+                        new StringNamedNode('number'),
+                    ])
+                ),
                 new StringNamedNode('forumLink'),
                 new BoolNamedNode('boolResultThreeFour'),
 
@@ -60,10 +66,10 @@ class RootDictFunctionalTest extends TestCase
                 ],
                 'forumLink' => '',
                 'boolResultThreeFour' => $faker->boolean(),
-            ])
+            ], JSON_PRESERVE_ZERO_FRACTION),
         ];
 
-        yield [
+        yield 'Second case' => [
             new RootDictNode([
                 new BoolNamedNode('boolResult'),
                 new DictNamedNode('bigDict', [
@@ -72,7 +78,7 @@ class RootDictFunctionalTest extends TestCase
                         new DictNamelessNode([
                             new IntNamedNode('id'),
                             new StringNamedNode('name'),
-                            new ListNamedNode('values', new ListNamelessNode(new StringNamelessNode()))
+                            new ListNamedNode('values', new ListNamelessNode(new StringNamelessNode())),
                         ])
                     ),
                     new ListNamedNode(
@@ -94,7 +100,7 @@ class RootDictFunctionalTest extends TestCase
                     ]),
                     new StringNamelessNode()
                 ),
-                new ListNamedNode('listOfStrings', new StringNamelessNode())
+                new ListNamedNode('listOfStrings', new StringNamelessNode()),
             ]),
             json_encode([
                 'boolResult' => $faker->boolean(),
@@ -140,7 +146,166 @@ class RootDictFunctionalTest extends TestCase
                         'keyThree' => $faker->word(),
                     ],
                 ],
-            ])
+            ], JSON_PRESERVE_ZERO_FRACTION),
+        ];
+
+        yield 'First nullable case' => [
+            new RootDictNode(
+                [new BoolNamedNode('bool', true, true)]
+            ),
+            json_encode(['bool' => null]),
+        ];
+
+        yield 'Second nullable case' => [
+            new RootDictNode([
+                new BoolNamedNode('boolResult'),
+                new DictNamedNode('bigDict', [
+                    new ListNamedNode(
+                        'listOfObjectsOne',
+                        new DictNamelessNode([
+                            new IntNamedNode('id'),
+                            new StringNamedNode('name', true, true),
+                            new ListNamedNode('values', new ListNamelessNode(new StringNamelessNode()), true, true),
+                        ])
+                    ),
+                ]),
+            ]),
+            json_encode([
+                'boolResult' => $faker->boolean(),
+                'bigDict' => [
+                    'listOfObjectsOne' => [
+                        [
+                            'id' => $faker->randomNumber(),
+                            'name' => null,
+                            'values' => null,
+                        ],
+                    ],
+                ],
+            ], JSON_PRESERVE_ZERO_FRACTION),
+        ];
+
+        yield 'First not required case' => [
+            new RootDictNode(
+                [new BoolNamedNode('bool', false)]
+            ),
+            json_encode([]),
+        ];
+
+        yield 'Second not required case' => [
+            new RootDictNode([
+                new BoolNamedNode('boolResult'),
+                new DictNamedNode('bigDict', [
+                    new ListNamedNode(
+                        'listOfObjectsOne',
+                        new DictNamelessNode([
+                            new IntNamedNode('id'),
+                            new StringNamedNode('name', false),
+                            new ListNamedNode('values', new ListNamelessNode(new StringNamelessNode()), false),
+                        ])
+                    ),
+                ]),
+            ]),
+            json_encode([
+                'boolResult' => $faker->boolean(),
+                'bigDict' => [
+                    'listOfObjectsOne' => [
+                        [
+                            'id' => $faker->randomNumber(),
+                        ],
+                    ],
+                ],
+            ], JSON_PRESERVE_ZERO_FRACTION),
+        ];
+
+        yield 'Not required and nullable case' => [
+            new RootDictNode([
+                new BoolNamedNode('boolResult'),
+                new DictNamedNode('bigDict', [
+                    new ListNamedNode(
+                        'listOfObjectsOne',
+                        new DictNamelessNode([
+                            new IntNamedNode('id'),
+                            new StringNamedNode('name', true, true),
+                            new ListNamedNode('values', new ListNamelessNode(new StringNamelessNode()), false),
+                        ])
+                    ),
+                ]),
+            ]),
+            json_encode([
+                'boolResult' => $faker->boolean(),
+                'bigDict' => [
+                    'listOfObjectsOne' => [
+                        [
+                            'id' => $faker->randomNumber(),
+                            'name' => null,
+                        ],
+                    ],
+                ],
+            ], JSON_PRESERVE_ZERO_FRACTION),
+        ];
+    }
+
+    /**
+     * @dataProvider failAssertDataProvider
+     */
+    public function testFailAssert(
+        RootDictNode $root,
+        string $json
+    ): void {
+        self::expectException(AssertFailedException::class);
+
+        $root->assert(json_decode($json, true));
+    }
+
+    public function failAssertDataProvider(): iterable
+    {
+        $faker = Factory::create();
+
+        yield 'Key is not exist' => [
+            new RootDictNode([
+                new DictNamedNode('bigDict', [
+                    new ListNamedNode(
+                        'listOfObjectsOne',
+                        new DictNamelessNode([
+                            new IntNamedNode('id'),
+                            new StringNamedNode('name'),
+                        ])
+                    ),
+                ]),
+            ]),
+            json_encode([
+                'bigDict' => [
+                    'listOfObjectsOne' => [
+                        [
+                            'id' => $faker->randomNumber(),
+                        ],
+                    ],
+                ],
+            ], JSON_PRESERVE_ZERO_FRACTION),
+        ];
+
+        yield 'Value in not valid' => [
+            new RootDictNode([
+                new DictNamedNode('bigDict', [
+                    new ListNamedNode(
+                        'listOfObjectsOne',
+                        new DictNamelessNode([
+                            new IntNamedNode('id'),
+                            new StringNamedNode('name'),
+                        ])
+                    ),
+                ]),
+            ]),
+            json_encode([
+                'bigDict' => [
+                    'listOfObjectsOne' => [
+                        [
+                            'id' => $faker->randomNumber(),
+                            'name' => $faker->randomNumber(),
+                        ],
+                    ],
+                ],
+            ], JSON_PRESERVE_ZERO_FRACTION),
         ];
     }
 }

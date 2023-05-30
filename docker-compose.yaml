@@ -6,6 +6,11 @@ services:
       context: ./docker
     volumes:
       - .:/application/
+      - ./docker/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini
+    command:
+      - ./endless_process
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   default:
